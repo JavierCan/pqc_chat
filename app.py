@@ -6,7 +6,6 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional
 
-# Import core cryptographic protocols
 from protocol_pqc import (
     kyber_encapsulate, 
     derive_aes_key, 
@@ -17,14 +16,13 @@ from protocol_pqc import (
 from hybrid_pki import HybridCertificate
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="PQC Hybrid Chat System",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS (Professional Terminal Style) ---
+
 st.markdown("""
 <style>
     /* Monospaced font for inputs to simulate terminal entry */
@@ -41,7 +39,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# SESSION STATE INITIALIZATION
+
 if "socket" not in st.session_state:
     st.session_state.socket = None
 if "connected" not in st.session_state:
@@ -55,14 +53,14 @@ if "aesgcm" not in st.session_state:
 if "server_id" not in st.session_state:
     st.session_state.server_id = "Unknown"
 
-# NETWORK HELPER FUNCTIONS
+
 
 def log_traffic(direction: str, packet_type: str, data_bytes: bytes, details: str = "") -> None:
     """
     Logs network events to the session state table.
     """
     if data_bytes and len(data_bytes) > 0:
-        # Show first 8 bytes in Hex uppercase
+
         hex_preview = data_bytes[:10].hex().upper() + "..." 
         size = len(data_bytes)
     else:
@@ -102,15 +100,21 @@ def receive_message_wrapper(sock: socket.socket) -> Optional[bytes]:
     except Exception:
         return None
 
-def connect_to_server():
+def connect_to_server(remote_ip: str):
+
     try:
-        HOST = '127.0.0.1'
+
+        HOST = remote_ip
         PORT = 12345
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(5.0) 
         s.connect((HOST, PORT))
+        s.settimeout(None) 
+        
         st.session_state.socket = s
         
-        # --- STEP 1: Receive Hybrid Certificate ---
+        # STEP 1: Receive Hybrid Certificate
         status_text.text("Status: Receiving Hybrid Certificate...")
         progress_bar.progress(10)
         
@@ -122,7 +126,7 @@ def connect_to_server():
             details="Payload: RSA_PK + Kyber_PK + Dilithium_PK + Signatures"
         )
         
-        # --- STEP 2: Verify Dual Signatures ---
+        # STEP 2: Verify Dual Signatures
         status_text.text("Status: Verifying Dual Signatures (RSA + Dilithium)...")
         progress_bar.progress(30)
         time.sleep(0.5) 
@@ -146,7 +150,7 @@ def connect_to_server():
             s.close()
             return
 
-        # --- STEP 3: Kyber Encapsulation ---
+        # STEP 3: Kyber Encapsulation
         status_text.text("Status: Encapsulating Secret (Kyber-512)...")
         progress_bar.progress(60)
         time.sleep(0.5)
@@ -171,7 +175,7 @@ def connect_to_server():
             details="Encapsulated Secret sent to Server"
         )
 
-        # --- STEP 4: Key Derivation (AES) ---
+        # STEP 4: Key Derivation (AES)
         status_text.text("Status: Deriving AES-256 GCM Keys...")
         progress_bar.progress(80)
         
@@ -198,20 +202,25 @@ def connect_to_server():
     except Exception as e:
         st.error(f"Connection Error: {e}")
 
-# --- UI LAYOUT ---
+# UI
 
 st.title("Hybrid PQC System")
 st.caption(f"Architecture: Kyber-512 (KEM) + Dilithium3 (Auth) + RSA (Identity) + AES-GCM (Transport)")
 
 # Sidebar: Connection Control
 with st.sidebar:
-    st.header("Network Status")
+    st.header("Network Configuration")
+    # UPDATED: Input field for Remote IP Address
+    target_ip = st.text_input("Server IP Address", value="127.0.0.1")
+    
+    st.header("Connection Status")
     if not st.session_state.connected:
         st.warning("Disconnected")
         if st.button("Initialize Handshake"):
             status_text = st.empty()
             progress_bar = st.progress(0)
-            connect_to_server()
+            # Pass the input IP to the connection function
+            connect_to_server(target_ip)
     else:
         st.success(f"Connected to: {st.session_state.server_id}")
         st.info("Protocol: AES-256-GCM")
@@ -226,6 +235,7 @@ with st.sidebar:
     st.markdown("- **KEM:** Kyber-512")
     st.markdown("- **Sig L1:** RSA-2048")
     st.markdown("- **Sig L2:** Dilithium3")
+
 
 # Main Layout
 col1, col2 = st.columns([2, 1])
@@ -304,12 +314,8 @@ with col2:
             height=400
         )
         
-        # Detail View
+
         last_log = st.session_state.logs[-1]
         st.info(f"Packet Inspection:\n\nType: {last_log['Type']}\nDetails: {last_log['Details']}")
     else:
         st.text("No traffic captured yet.")
-
-
-
-        
