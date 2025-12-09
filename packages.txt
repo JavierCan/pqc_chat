@@ -1,9 +1,0 @@
-cmake
-gcc
-g++
-make
-libssl-dev
-libtool
-openssl
-ninja-build
-automake
