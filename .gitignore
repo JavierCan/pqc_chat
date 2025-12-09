@@ -1,0 +1,13 @@
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pem
+
+liboqs-python/
+venv/
+env/
+.env
+.DS_Store
+stats.py 
