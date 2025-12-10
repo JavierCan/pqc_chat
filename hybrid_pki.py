@@ -26,7 +26,7 @@ class HybridCertificate:
         self.rsa_public_bytes = b''
         self.dilithium_public_bytes = dilithium_pk 
         
-        # Si nos dan las llaves privadas, firmamos de inmediato
+
         if rsa_sk and dilithium_sk:
             self.sign_certificate(rsa_sk, dilithium_sk)
 
@@ -50,12 +50,11 @@ class HybridCertificate:
             hashes.SHA256()
         )
 
-        # 3. Firma Post-Cuántica (Dilithium) - AQUÍ ESTABA EL ERROR
+        # 3. Firma Post-Cuántica (Dilithium)
         with oqs.Signature(DILITHIUM_ALG) as signer:
-            # === CORRECCIÓN DE MEMORIA ===
-            # Creamos un buffer de memoria C explícito
+
             secret_buf = ctypes.create_string_buffer(dilithium_sk_bytes, len(dilithium_sk_bytes))
-            signer.secret_key = secret_buf  # Asignamos el buffer, NO los bytes directos
+            signer.secret_key = secret_buf  
             # ============================
             self.dilithium_signature = signer.sign(data_to_sign)
 
@@ -105,7 +104,7 @@ class HybridCertificate:
         except Exception:
             return None
 
-# Helpers para generar llaves (usados por el servidor)
+
 def generate_rsa_identity():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
 

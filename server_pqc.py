@@ -25,10 +25,7 @@ HOST = '127.0.0.1'
 PORT = 12345
 
 def run_headless_chat(sock: socket.socket, aesgcm: AESGCM):
-    """
-    Automated chat loop for the Cloud Demo.
-    It receives messages and auto-replies.
-    """
+
     print("[Server-Headless] Chat loop started.", flush=True)
     try:
         while True:
@@ -38,16 +35,16 @@ def run_headless_chat(sock: socket.socket, aesgcm: AESGCM):
                 print("[Server-Headless] Client disconnected.")
                 break
             
-            # 2. Decrypt
+
             nonce, ciphertext = data[:NONCE_LENGTH], data[NONCE_LENGTH:]
             try:
                 plaintext = aesgcm.decrypt(nonce, ciphertext, None).decode()
                 print(f"[Server-Headless] Received: {plaintext}", flush=True)
                 
-                # 3. Auto-Reply (Bot Mode)
+
                 response_text = f"Server ACK: I received '{plaintext}' securely."
                 
-                # Encrypt Reply
+                
                 reply_nonce = os.urandom(NONCE_LENGTH)
                 reply_ciphertext = aesgcm.encrypt(reply_nonce, response_text.encode(), None)
                 send_message(sock, reply_nonce + reply_ciphertext)
@@ -87,20 +84,20 @@ def handle_client(conn: socket.socket, addr: tuple):
         pem_bytes = cert.to_pem()
         send_message(conn, pem_bytes)
 
-        # 4. Handshake completion
+
         ciphertext = receive_message(conn)
         salt = receive_message(conn)
         
         shared_secret = kyber_decapsulate(server_kem, ciphertext)
         aesgcm = derive_aes_key(shared_secret, salt)
         
-        # 5. Start Bot Chat
+
         run_headless_chat(conn, aesgcm)
         
     except Exception as e:
         print(f"[Server-Handler] Error processing client {addr}: {e}")
     finally:
-        # Ensure the connection is closed when the thread is done
+
         conn.close()
         print(f"[Server] Client {addr} connection closed.", flush=True)
 
@@ -113,14 +110,14 @@ def start_server_thread():
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
-        # 🚨 CORRECCIÓN 1: Asegurar la reutilización del puerto
+
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
-        # Intentar rehusar el puerto agresivamente (útil para reinicios rápidos)
+
         try:
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         except AttributeError:
-            # Ignorar si el sistema operativo no lo soporta (ej: algunos Linux en la nube)
+
             pass
             
         server_socket.bind((HOST, PORT))
@@ -135,10 +132,10 @@ def start_server_thread():
             client_thread.start()
             
     except OSError as e:
-        # 🚨 CORRECCIÓN 2: Manejar específicamente el error de puerto ocupado y morir limpiamente.
+
         if "Address already in use" in str(e):
              print(f"[Server] Critical: {e}. Port {PORT} is still in TIME_WAIT state. Server thread failed to start.", flush=True)
-             return # Sale del hilo, permitiendo que la caché de Streamlit intente de nuevo.
+             return 
         else:
              raise e
     except Exception as e:

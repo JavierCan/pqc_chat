@@ -32,11 +32,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- BACKGROUND SERVER LAUNCHER ---
-# This starts the server thread only once when the app is first deployed.
+
 @st.cache_resource
 def launch_background_server():
-    print("Initializing Background Server Thread...")
+    print("Initializing Server ")
     server_thread = threading.Thread(target=server_pqc.start_server_thread, daemon=True)
     server_thread.start()
     return server_thread
@@ -111,27 +110,27 @@ def receive_message_wrapper(sock: socket.socket) -> Optional[bytes]:
 def connect_to_local_server():
     """Connects to the background thread server on localhost with retries."""
     
-    HOST = '127.0.0.1' # Always Localhost for Cloud Demo
+    HOST = '127.0.0.1' 
     PORT = 12345
     
     st.session_state.socket = None
     
-    # --- LOGIC TO HANDLE SERVER STARTUP DELAY (RETRY LOOP) ---
+
     for attempt in range(MAX_RETRIES):
         status_text.text(f"Status: Attempting connection to server thread (Attempt {attempt + 1}/{MAX_RETRIES})...")
         progress_bar.progress((attempt + 1) / MAX_RETRIES * 0.1)
         
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(1.0) # Short timeout for connection test
+            s.settimeout(1.0) 
             s.connect((HOST, PORT))
-            s.settimeout(None) # Reset to blocking after successful connect
+            s.settimeout(None) 
             
             st.session_state.socket = s
-            break # Success! Exit the retry loop
+            break 
             
         except (ConnectionRefusedError, socket.timeout):
-            # Server not listening yet or busy. Wait and retry.
+
             time.sleep(RETRY_DELAY)
             if attempt == MAX_RETRIES - 1:
                 st.error("Connection Error: Server thread failed to start or port is blocked.")
@@ -142,7 +141,7 @@ def connect_to_local_server():
             
     if not st.session_state.socket:
         return
-    # --- END RETRY LOGIC ---
+
     
     try:
         s = st.session_state.socket
@@ -195,7 +194,7 @@ def connect_to_local_server():
     except Exception as e:
         st.error(f"Handshake Error: {e}")
 
-# --- UI LAYOUT ---
+# UI
 st.title("Full Hybrid PQC System (Cloud Demo)")
 st.caption(f"Architecture: Kyber-512 + Dilithium3 + RSA + AES-GCM (Running in Container)")
 
