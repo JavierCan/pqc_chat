@@ -22,8 +22,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import server_pqc 
 
 # --- CONFIGURATION CONSTANTS FOR RETRY LOGIC ---
-MAX_RETRIES = 10
-RETRY_DELAY = 1.0 
+MAX_RETRIES = 20
+RETRY_DELAY = 2.0 
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
