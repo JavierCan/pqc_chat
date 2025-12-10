@@ -2,7 +2,7 @@ import streamlit as st
 import socket
 import os
 import time
-import threading  # <--- NUEVO
+import threading  
 import pandas as pd
 from datetime import datetime
 from typing import Optional
@@ -21,6 +21,10 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 # Import the server logic to run it locally
 import server_pqc 
 
+# --- CONFIGURATION CONSTANTS FOR RETRY LOGIC ---
+MAX_RETRIES = 10
+RETRY_DELAY = 1.0 
+
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="PQC Hybrid Chat System",
@@ -29,7 +33,7 @@ st.set_page_config(
 )
 
 # --- BACKGROUND SERVER LAUNCHER ---
-# This verifies if the server is running. If not, it starts it in a background thread.
+# This starts the server thread only once when the app is first deployed.
 @st.cache_resource
 def launch_background_server():
     print("Initializing Background Server Thread...")
@@ -105,17 +109,43 @@ def receive_message_wrapper(sock: socket.socket) -> Optional[bytes]:
         return None
 
 def connect_to_local_server():
-    """Connects to the background thread server on localhost."""
+    """Connects to the background thread server on localhost with retries."""
+    
+    HOST = '127.0.0.1' # Always Localhost for Cloud Demo
+    PORT = 12345
+    
+    st.session_state.socket = None
+    
+    # --- LOGIC TO HANDLE SERVER STARTUP DELAY (RETRY LOOP) ---
+    for attempt in range(MAX_RETRIES):
+        status_text.text(f"Status: Attempting connection to server thread (Attempt {attempt + 1}/{MAX_RETRIES})...")
+        progress_bar.progress(attempt / MAX_RETRIES * 10)
+        
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1.0) # Short timeout for connection test
+            s.connect((HOST, PORT))
+            s.settimeout(None) # Reset to blocking after successful connect
+            
+            st.session_state.socket = s
+            break # Success! Exit the retry loop
+            
+        except (ConnectionRefusedError, socket.timeout):
+            # Server not listening yet or busy. Wait and retry.
+            time.sleep(RETRY_DELAY)
+            if attempt == MAX_RETRIES - 1:
+                st.error("Connection Error: Server thread failed to start or port is blocked.")
+                return
+        except Exception as e:
+            st.error(f"Critical Connection Error during setup: {e}")
+            return
+            
+    if not st.session_state.socket:
+        return
+    # --- END RETRY LOGIC ---
+    
     try:
-        HOST = '127.0.0.1' # Always Localhost for Cloud Demo
-        PORT = 12345
-        
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2.0)
-        s.connect((HOST, PORT))
-        s.settimeout(None)
-        
-        st.session_state.socket = s
+        s = st.session_state.socket
         
         # 1. Certificate
         status_text.text("Status: Receiving Hybrid Certificate...")
@@ -163,7 +193,7 @@ def connect_to_local_server():
         st.rerun()
         
     except Exception as e:
-        st.error(f"Connection Error (Ensure Server Thread is running): {e}")
+        st.error(f"Handshake Error: {e}")
 
 # --- UI LAYOUT ---
 st.title("Full Hybrid PQC System (Cloud Demo)")
