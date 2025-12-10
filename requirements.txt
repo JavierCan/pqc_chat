@@ -1,0 +1,10 @@
+# Dependencias del Sistema
+cryptography>=41.0.0
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy<2.0
+matplotlib
+
+# LIBRERÍA PQC (Instalación desde Código Fuente)
+# Esto obliga a Streamlit a clonar y compilar la librería específica
+liboqs @ git+https://github.com/open-quantum-safe/liboqs-python.git@main
