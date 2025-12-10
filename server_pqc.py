@@ -112,27 +112,37 @@ def start_server_thread():
 
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)        
+        
+        # 🚨 CORRECCIÓN 1: Asegurar la reutilización del puerto
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        
+        # Intentar rehusar el puerto agresivamente (útil para reinicios rápidos)
+        try:
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except AttributeError:
+            # Ignorar si el sistema operativo no lo soporta (ej: algunos Linux en la nube)
+            pass
+            
         server_socket.bind((HOST, PORT))
-        # Listening for more than one connection simultaneously
         server_socket.listen(5) 
         print(f"[Server] Listening internally for concurrent connections on {HOST}:{PORT}...", flush=True)
         
         while True:
-            # 🚨 Non-blocking acceptance of connections
             conn, addr = server_socket.accept()
             print(f"[Server] Incoming connection from {addr}. Starting new handler thread.", flush=True)
             
-            # 🚨 Start a new thread to manage this client
             client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
             client_thread.start()
             
     except OSError as e:
-        # This is expected when Streamlit restarts the app and the port is still in use
-        print(f"[Server] Port error (likely already running or bind failed): {e}")
+        # 🚨 CORRECCIÓN 2: Manejar específicamente el error de puerto ocupado y morir limpiamente.
+        if "Address already in use" in str(e):
+             print(f"[Server] Critical: {e}. Port {PORT} is still in TIME_WAIT state. Server thread failed to start.", flush=True)
+             return # Sale del hilo, permitiendo que la caché de Streamlit intente de nuevo.
+        else:
+             raise e
     except Exception as e:
         print(f"[Server] Critical error: {e}")
 
 if __name__ == "__main__":
-    # If run locally, it will start the multi-threaded server.
     start_server_thread()
