@@ -119,7 +119,7 @@ def connect_to_local_server():
     # --- LOGIC TO HANDLE SERVER STARTUP DELAY (RETRY LOOP) ---
     for attempt in range(MAX_RETRIES):
         status_text.text(f"Status: Attempting connection to server thread (Attempt {attempt + 1}/{MAX_RETRIES})...")
-        progress_bar.progress(attempt / MAX_RETRIES * 10)
+        progress_bar.progress((attempt + 1) / MAX_RETRIES * 0.1)
         
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
