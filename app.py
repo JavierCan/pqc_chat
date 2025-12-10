@@ -72,14 +72,23 @@ if "aesgcm" not in st.session_state:
 if "server_id" not in st.session_state:
     st.session_state.server_id = "Unknown"
 
-# NETWORK HELPERS (Same as before)
+PREVIEW_BYTES = 32
+
 def log_traffic(direction: str, packet_type: str, data_bytes: bytes, details: str = "") -> None:
     if data_bytes and len(data_bytes) > 0:
-        hex_preview = data_bytes[:10].hex().upper() + "..." 
+
+        preview_len = min(len(data_bytes), PREVIEW_BYTES)
+        hex_preview = data_bytes[:preview_len].hex().upper()
+        
+
+        if len(data_bytes) > PREVIEW_BYTES:
+            hex_preview += "..."
+
         size = len(data_bytes)
     else:
         hex_preview = "N/A"
         size = 0
+    
     timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     st.session_state.logs.append({
         "Time": timestamp, "Direction": direction, "Type": packet_type,
