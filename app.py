@@ -72,7 +72,7 @@ if "aesgcm" not in st.session_state:
 if "server_id" not in st.session_state:
     st.session_state.server_id = "Unknown"
 
-PREVIEW_BYTES = 32
+PREVIEW_BYTES = 42
 
 def log_traffic(direction: str, packet_type: str, data_bytes: bytes, details: str = "") -> None:
     if data_bytes and len(data_bytes) > 0:
