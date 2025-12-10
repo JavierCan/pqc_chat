@@ -95,14 +95,25 @@ class HybridCertificate:
 
     @staticmethod
     def from_pem(pem_data: bytes):
+
         try:
-            if not pem_data: return None
+            if not pem_data:
+
+                return None
+            
             pem_str = pem_data.decode('utf-8')
+
             lines = pem_str.strip().split('\n')
+
             b64_data = "".join([l for l in lines if "-----" not in l])
-            return pickle.loads(base64.b64decode(b64_data))
-        except Exception:
-            return None
+
+            serialized_data = base64.b64decode(b64_data)
+            return pickle.loads(serialized_data)
+        
+        except Exception as e:
+
+            print(f"[PKI] Error decodificando PEM: {e}")
+            return None 
 
 
 def generate_rsa_identity():

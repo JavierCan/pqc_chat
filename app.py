@@ -22,8 +22,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import server_pqc 
 
 # --- CONFIGURATION CONSTANTS FOR RETRY LOGIC ---
-MAX_RETRIES = 10
-RETRY_DELAY = 1.0 
+MAX_RETRIES = 20
+RETRY_DELAY = 2.0 
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -130,7 +130,7 @@ def connect_to_local_server():
             break 
             
         except (ConnectionRefusedError, socket.timeout):
-
+            # Server not listening yet or busy. Wait and retry.
             time.sleep(RETRY_DELAY)
             if attempt == MAX_RETRIES - 1:
                 st.error("Connection Error: Server thread failed to start or port is blocked.")
@@ -141,7 +141,7 @@ def connect_to_local_server():
             
     if not st.session_state.socket:
         return
-
+    # --- END RETRY LOGIC ---
     
     try:
         s = st.session_state.socket
