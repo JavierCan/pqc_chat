@@ -1,6 +1,8 @@
 import socket
 import time
 import os
+import threading # <--- NUEVO: Para manejar concurrencia
+from typing import Any
 from protocol_pqc import (
     generate_kyber_keypair, 
     kyber_decapsulate, 
@@ -16,12 +18,13 @@ from hybrid_pki import (
     HybridCertificate
 )
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.exceptions import InvalidTag
 
 HOST = '127.0.0.1'
 PORT = 12345
 
-def run_headless_chat(sock, aesgcm):
+def run_headless_chat(sock: socket.socket, aesgcm: AESGCM):
     """
     Automated chat loop for the Cloud Demo.
     It receives messages and auto-replies.
@@ -57,59 +60,79 @@ def run_headless_chat(sock, aesgcm):
     except Exception as e:
         print(f"[Server-Headless] Loop error: {e}")
 
+def handle_client(conn: socket.socket, addr: tuple):
+    """
+    Handles the full PQC Handshake and Chat for a single client connection.
+    This function runs inside its own thread.
+    """
+    try:
+        print(f"[Server] Handshake starting for {addr}...", flush=True)
+
+        # 1. KEM (Kyber)
+        kyber_pk, kyber_sk_ctx, server_kem = generate_kyber_keypair()
+        time.sleep(STEP_PAUSE)
+
+        # 2. Identities (RSA + Dilithium)
+        rsa_sk: rsa.RSAPrivateKey = generate_rsa_identity()
+        dil_pk, dil_sk = generate_dilithium_identity()
+
+        # 3. Certificate
+        cert = HybridCertificate(
+            server_id="Cloud_Server_Bot", 
+            kyber_pk=kyber_pk, 
+            rsa_sk=rsa_sk, 
+            dilithium_sk=dil_sk, 
+            dilithium_pk=dil_pk
+        )
+        pem_bytes = cert.to_pem()
+        send_message(conn, pem_bytes)
+
+        # 4. Handshake completion
+        ciphertext = receive_message(conn)
+        salt = receive_message(conn)
+        
+        shared_secret = kyber_decapsulate(server_kem, ciphertext)
+        aesgcm = derive_aes_key(shared_secret, salt)
+        
+        # 5. Start Bot Chat
+        run_headless_chat(conn, aesgcm)
+        
+    except Exception as e:
+        print(f"[Server-Handler] Error processing client {addr}: {e}")
+    finally:
+        # Ensure the connection is closed when the thread is done
+        conn.close()
+        print(f"[Server] Client {addr} connection closed.", flush=True)
+
 def start_server_thread():
     """
-    Main function designed to run in a background thread.
+    Main server listener. It starts a new thread for every incoming connection.
     """
-    print("--- STARTING BACKGROUND PQC SERVER ---", flush=True)
+    print("--- STARTING CONCURRENT PQC SERVER ---", flush=True)
 
-    # Use a try-except block to handle port already in use (common in Streamlit reloads)
     try:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)        
         server_socket.bind((HOST, PORT))
-        server_socket.listen(1)
-        print(f"[Server] Listening internally on {HOST}:{PORT}...", flush=True)
+        # Listening for more than one connection simultaneously
+        server_socket.listen(5) 
+        print(f"[Server] Listening internally for concurrent connections on {HOST}:{PORT}...", flush=True)
         
         while True:
-            # Accept loop to allow reconnections
+            # 🚨 Non-blocking acceptance of connections
             conn, addr = server_socket.accept()
-            with conn:
-                print(f"[Server] Internal connection from {addr}", flush=True)
-
-                # 1. KEM (Kyber)
-                kyber_pk, kyber_sk_ctx, server_kem = generate_kyber_keypair()
-                time.sleep(0.5)
-
-                # 2. Identities (RSA + Dilithium)
-                rsa_sk = generate_rsa_identity()
-                dil_pk, dil_sk = generate_dilithium_identity()
-
-                # 3. Certificate
-                cert = HybridCertificate(
-                    server_id="Cloud_Server_Bot", 
-                    kyber_pk=kyber_pk, 
-                    rsa_sk=rsa_sk, 
-                    dilithium_sk=dil_sk, 
-                    dilithium_pk=dil_pk
-                )
-                pem_bytes = cert.to_pem()
-                send_message(conn, pem_bytes)
-
-                # 4. Handshake completion
-                ciphertext = receive_message(conn)
-                salt = receive_message(conn)
-                
-                shared_secret = kyber_decapsulate(server_kem, ciphertext)
-                aesgcm = derive_aes_key(shared_secret, salt)
-                
-                # 5. Start Bot Chat
-                run_headless_chat(conn, aesgcm)
-                
+            print(f"[Server] Incoming connection from {addr}. Starting new handler thread.", flush=True)
+            
+            # 🚨 Start a new thread to manage this client
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
+            
     except OSError as e:
-        print(f"[Server] Port error (likely already running): {e}")
+        # This is expected when Streamlit restarts the app and the port is still in use
+        print(f"[Server] Port error (likely already running or bind failed): {e}")
     except Exception as e:
         print(f"[Server] Critical error: {e}")
 
 if __name__ == "__main__":
+    # If run locally, it will start the multi-threaded server.
     start_server_thread()
